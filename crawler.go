@@ -42,6 +42,11 @@ type Record struct {
 	FundID uint
 }
 
+// set Fund's table name to be `sampled_funds`
+func (Fund) TableName() string {
+	return "sampled_funds"
+}
+
 func (self *Fund) PopulateRecords(db *gorm.DB) {
 	url := BuildQueryString(self)
 	response := FetchCSV(url, self)
