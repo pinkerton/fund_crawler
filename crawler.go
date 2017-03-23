@@ -37,8 +37,8 @@ type Fund struct {
 type Record struct {
 	gorm.Model
 	Day    time.Time
-	Open   float64
-	Close  float64
+	Open   int
+	Close  int
 	FundID uint
 }
 
@@ -110,11 +110,13 @@ func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 		if err != nil {
 			err = errors.New("failed to parse open price")
 		}
+		openPriceCents := int(openPrice * 100)
 
 		closePrice, err := strconv.ParseFloat(record[CSVCloseIndex], 32)
 		if err != nil {
 			err = errors.New("failed to parse close price")
 		}
+		closePriceCents := int(closePrice * 100)
 
 		// Convert time from string to time
 		const dateFormat = "2006-01-02"
@@ -125,8 +127,8 @@ func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 
 		var fundRecord = Record{
 			Day:    recordDate,
-			Open:   openPrice,
-			Close:  closePrice,
+			Open:   openPriceCents,
+			Close:  closePriceCents,
 			FundID: fund.ID}
 		records = append(records, fundRecord)
 	}
