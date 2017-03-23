@@ -42,11 +42,12 @@ type Record struct {
 	FundID uint
 }
 
-// set Fund's table name to be `sampled_funds`
+// Manually set the Fund's table name to the sample we created.
 func (Fund) TableName() string {
 	return "sampled_funds"
 }
 
+// High-level method that calls functions to request, parse, and create Records.
 func (self *Fund) PopulateRecords(db *gorm.DB) {
 	url := BuildQueryString(self)
 	response := FetchCSV(url, self)
@@ -65,6 +66,8 @@ func (self *Fund) PopulateRecords(db *gorm.DB) {
 	db.Save(&self)
 }
 
+// Build the URL we'll GET with the specific fund's symbol.
+// The time range is hardcoded: Jan. 1, 2000 to Dec. 31, 2016.
 func BuildQueryString(fund *Fund) *url.URL {
 	u, err := url.Parse("http://ichart.finance.yahoo.com/table.csv?s=VOO&a=00&b=01&c=2000&d=11&e=31&f=2016&g=d&ignore=.csv")
 	if err != nil {
@@ -76,6 +79,11 @@ func BuildQueryString(fund *Fund) *url.URL {
 	return u
 }
 
+// Make a GET request to the built URL and return it.
+// Assumes the caller will close response.Body.
+// TODO: Consider the implicaitons of this. It makes more sense to do build a
+// CSV reader and ReadAll() into a 2d array and return a pointer to that,
+// because the caller should not have to clean up after us.
 func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 	response, err := http.Get(url.String())
 	if err != nil {
@@ -84,6 +92,9 @@ func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 	return response
 }
 
+// Parse the response data as CSV, and create a new Record for each row.
+// TODO: Refactor into smaller units.
+// TODO: Add multithreading.
 func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 	// Parse as CSV
 	defer response.Body.Close()
@@ -140,6 +151,8 @@ func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 	return &records, err
 }
 
+// Main function that controls the crawler.
+// TODO: This should spawn worker threads.
 func Crawl() {
 	var adapter string
 	var dbPath string
