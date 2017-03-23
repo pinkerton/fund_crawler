@@ -138,7 +138,7 @@ func Crawl() {
 	var dbPath string
 	if os.Getenv("CLOUD_BABY") == "YEAH_BABY" {
 		adapter = "mysql"
-		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@/index_funds?charset=utf8&parseTime=True&loc=Local"
+		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@127.0.0.1/index_funds?charset=utf8&parseTime=True&loc=Local"
 	} else {
 		adapter = "sqlite3"
 		dbPath = "db/funds.db"
