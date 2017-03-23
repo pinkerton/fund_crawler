@@ -160,7 +160,7 @@ func Crawl() {
 	db.AutoMigrate(&Fund{}, &Record{})
 
 	funds := []Fund{}
-	db.Where(&Fund{Done: false}).Find(&funds)
+	db.Where("done = 0").Find(&funds)
 	fmt.Println(len(funds))
 	for _, fund := range funds {
 		fmt.Println("Fetching fund: ", fund.Symbol)
