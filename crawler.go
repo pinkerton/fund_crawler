@@ -42,6 +42,14 @@ type Record struct {
 	FundID uint
 }
 
+type AnnualReturn struct {
+	gorm.Model
+	Year   int
+	Open   int
+	Close  int
+	Change float64
+}
+
 // Manually set the Fund's table name to the sample we created.
 func (Fund) TableName() string {
 	return "sampled_funds"
@@ -170,13 +178,25 @@ func Crawl() {
 	defer db.Close()
 
 	// Migrate the schema
-	db.AutoMigrate(&Fund{}, &Record{})
+	db.AutoMigrate(&Fund{}, &Record{}, &AnnualReturn{})
 
 	funds := []Fund{}
 	db.Where("done = 0").Find(&funds)
-	fmt.Println(len(funds))
+	fmt.Println("Funds to scrape: ", len(funds))
 	for _, fund := range funds {
 		fmt.Println("Fetching fund: ", fund.Symbol)
 		fund.PopulateRecords(db)
+	}
+
+	fmt.Println("Calculating annual return")
+	allFunds := []Fund{}
+	db.Where("id = 2").Find(&allFunds)
+	for _, fund := range allFunds {
+		records := []Record{}
+		db.Where(Record{FundID: fund.ID}).Order("day asc").Find(&records)
+		fmt.Println("FUND: ", fund.Name)
+		for _, record := range records {
+			fmt.Println(record)
+		}
 	}
 }
