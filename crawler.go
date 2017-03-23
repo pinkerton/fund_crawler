@@ -66,7 +66,7 @@ func (self *Fund) PopulateRecords(db *gorm.DB) {
 }
 
 func BuildQueryString(fund *Fund) *url.URL {
-	u, err := url.Parse("http://ichart.finance.yahoo.com/table.csv?s=VOO&a=11&b=15&c=2000&d=11&e=19&f=2017&g=d&ignore=.csv")
+	u, err := url.Parse("http://ichart.finance.yahoo.com/table.csv?s=VOO&a=00&b=01&c=2000&d=11&e=31&f=2016&g=d&ignore=.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
