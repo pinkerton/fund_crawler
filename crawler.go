@@ -199,7 +199,7 @@ func Crawl() {
 		fmt.Printf("Performance for: %s (%d records)\n", fund.Symbol, len(records))
 
 		if len(records)%2 != 0 {
-			log.Panic("number of returned rows should be even!")
+			fmt.Println("Odd # rows!")
 			fund.BadData = true
 			db.Save(&fund)
 			continue
