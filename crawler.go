@@ -48,7 +48,7 @@ type AnnualReturn struct {
 	gorm.Model
 	FundID uint
 	Year   int
-	Change float64
+	Diff   float64
 }
 
 // Manually set the Fund's table name to the sample we created.
@@ -209,9 +209,9 @@ func Crawl() {
 			year := records[i].Day.Year()
 			yearOpening := records[i].Open
 			yearClosing := records[i+1].Close
-			var change float64 = float64(yearClosing-yearOpening) / float64(yearOpening)
-			fmt.Printf("\t%d: %.3f\n", year, change)
-			performance := AnnualReturn{FundID: fund.ID, Year: year, Change: change}
+			var diff float64 = float64(yearClosing-yearOpening) / float64(yearOpening)
+			fmt.Printf("\t%d: %.3f\n", year, diff)
+			performance := AnnualReturn{FundID: fund.ID, Year: year, Diff: diff}
 			db.Create(&performance)
 		}
 		fund.DonePerf = true
