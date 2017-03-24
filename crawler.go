@@ -201,7 +201,7 @@ func Crawl() {
 				having
 					month(day) = 1 
 					or month(day) = 12`, fund.ID).Scan(&records)
-		fmt.Println("Performance for: ", fund.Name)
+		fmt.Printf("Performance for: %s (%d records)\n", fund.Symbol, len(records))
 
 		if len(records)%2 != 0 {
 			log.Panic("number of returned rows should be even!")
