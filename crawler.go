@@ -194,13 +194,7 @@ func Crawl() {
 	db.Where("id = 2").Find(&allFunds)
 	for _, fund := range allFunds {
 		records := []Record{}
-		db.Exec(`select * from records 
-				where fund_id = ? 
-				group by 
-					year(day), month(day) 
-				having
-					month(day) = 1 
-					or month(day) = 12`, fund.ID).Scan(&records)
+		db.Where("fund_id = ?", fund.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
 		fmt.Printf("Performance for: %s (%d records)\n", fund.Symbol, len(records))
 
 		if len(records)%2 != 0 {
