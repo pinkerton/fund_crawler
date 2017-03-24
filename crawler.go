@@ -31,6 +31,8 @@ type Fund struct {
 	Type      string
 	Available bool     `gorm:"default:true"`
 	Done      bool     `gorm:"default:false"`
+	BadData   bool     `gorm:"default:false"`
+	DonePerf  bool     `gorm:"default:false"`
 	Records   []Record `gorm:"ForeignKey:FundID"`
 }
 
@@ -190,7 +192,7 @@ func Crawl() {
 	}
 
 	allFunds := []Fund{}
-	db.Find(&allFunds)
+	db.Where("done_perf = 0").Find(&allFunds)
 	for _, fund := range allFunds {
 		records := []Record{}
 		db.Where("fund_id = ?", fund.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
@@ -198,6 +200,9 @@ func Crawl() {
 
 		if len(records)%2 != 0 {
 			log.Panic("number of returned rows should be even!")
+			fund.BadData = true
+			db.Save(&fund)
+			continue
 		}
 
 		for i := 0; i < len(records)-1; i += 2 {
@@ -209,5 +214,7 @@ func Crawl() {
 			performance := AnnualReturn{FundID: fund.ID, Year: year, Change: change}
 			db.Create(&performance)
 		}
+		fund.DonePerf = true
+		db.Save(&fund)
 	}
 }
