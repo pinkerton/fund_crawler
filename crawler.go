@@ -189,9 +189,8 @@ func Crawl() {
 		fund.PopulateRecords(db)
 	}
 
-	fmt.Println("Calculating annual return")
 	allFunds := []Fund{}
-	db.Where("id = 2").Find(&allFunds)
+	db.Find(&allFunds)
 	for _, fund := range allFunds {
 		records := []Record{}
 		db.Where("fund_id = ?", fund.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
