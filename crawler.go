@@ -44,9 +44,8 @@ type Record struct {
 
 type AnnualReturn struct {
 	gorm.Model
+	FundID uint
 	Year   int
-	Open   int
-	Close  int
 	Change float64
 }
 
@@ -195,10 +194,27 @@ func Crawl() {
 	db.Where("id = 2").Find(&allFunds)
 	for _, fund := range allFunds {
 		records := []Record{}
-		db.Where(Record{FundID: fund.ID}).Order("day asc").Find(&records)
-		fmt.Println("FUND: ", fund.Name)
-		for _, record := range records {
-			fmt.Println(record)
+		db.Exec(`select * from records 
+				where fund_id = ? 
+				group by 
+					year(day), month(day) 
+				having
+					month(day) = 1 
+					or month(day) = 12`, fund.ID).Scan(&records)
+		fmt.Println("Performance for: ", fund.Name)
+
+		if len(records)%2 != 0 {
+			log.Panic("number of returned rows should be even!")
+		}
+
+		for i := 0; i < len(records)-1; i += 2 {
+			year := records[i].Day.Year()
+			yearOpening := records[i].Open
+			yearClosing := records[i+1].Close
+			var change float64 = float64(yearClosing-yearOpening) / float64(yearOpening)
+			fmt.Printf("\t%d: %.3f\n", year, change)
+			performance := AnnualReturn{FundID: fund.ID, Year: year, Change: change}
+			db.Create(&performance)
 		}
 	}
 }
