@@ -27,6 +27,7 @@ func ScrapeRecords(state *CrawlerState) {
 	for fund := range state.Funds {
 		err := fund.PopulateRecords(state.DB)
 		if err != nil {
+			fmt.Printf("Skipping %s\n", fund.Symbol)
 			continue
 		}
 		fund.CalculateReturn(state.DB)

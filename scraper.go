@@ -25,7 +25,9 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 	if len(records)%2 != 0 || len(records) == 0 {
 		// fmt.Printf("Bad # rows (%d)\n", len(records))
 		self.Available = false
+		self.Done = true
 		db.Save(&self)
+		return
 	}
 
 	for i := 0; i < len(records)-1; i += 2 {
@@ -108,7 +110,7 @@ func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 			break
 		}
 
-		// skip parsing the table header
+		// skip parsing the csv table header
 		if isFirstRecord {
 			isFirstRecord = false
 			continue
