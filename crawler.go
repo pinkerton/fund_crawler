@@ -13,7 +13,7 @@ const (
 	CSVDateIndex  = 0
 	CSVOpenIndex  = 1
 	CSVCloseIndex = 4
-	NumWorkers    = 10
+	NumWorkers    = 30
 )
 
 // CrawlerState holds state shared by worker goroutines.
