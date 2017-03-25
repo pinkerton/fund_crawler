@@ -25,7 +25,10 @@ type CrawlerState struct {
 
 func ScrapeRecords(state *CrawlerState) {
 	for fund := range state.Funds {
-		fund.PopulateRecords(state.DB)
+		err := fund.PopulateRecords(state.DB)
+		if err != nil {
+			continue
+		}
 		fund.CalculateReturn(state.DB)
 		fmt.Printf("%s\n", fund.Symbol)
 	}

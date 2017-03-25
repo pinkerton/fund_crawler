@@ -40,7 +40,7 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 }
 
 // High-level method that calls functions to request, parse, and create Records.
-func (self *Fund) PopulateRecords(db *gorm.DB) {
+func (self *Fund) PopulateRecords(db *gorm.DB) (err error) {
 	url := BuildQueryString(self)
 	response := FetchCSV(url, self)
 	records, err := ParseRecords(response, self)
@@ -56,6 +56,7 @@ func (self *Fund) PopulateRecords(db *gorm.DB) {
 	}
 	self.Done = true
 	db.Save(&self)
+	return
 }
 
 // Build the URL we'll GET with the specific fund's symbol.
