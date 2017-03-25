@@ -1,17 +1,9 @@
 package fund_crawler
 
 import (
-	"bufio"
-	"encoding/csv"
-	"errors"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"strconv"
-	"time"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -22,153 +14,33 @@ const (
 	CSVDateIndex  = 0
 	CSVOpenIndex  = 1
 	CSVCloseIndex = 4
+	NumWorkers    = 10
 )
 
-type Fund struct {
-	gorm.Model
-	Symbol    string
-	Name      string
-	Type      string
-	Available bool     `gorm:"default:true"`
-	Done      bool     `gorm:"default:false"`
-	BadData   bool     `gorm:"default:false"`
-	DonePerf  bool     `gorm:"default:false"`
-	Records   []Record `gorm:"ForeignKey:FundID"`
+// CrawlerState holds state shared by worker goroutines.
+type CrawlerState struct {
+	DB    *gorm.DB
+	WG    *sync.WaitGroup
+	Funds chan Fund
 }
 
-type Record struct {
-	gorm.Model
-	Day    time.Time
-	Open   int
-	Close  int
-	FundID uint
-}
-
-type AnnualReturn struct {
-	gorm.Model
-	FundID uint
-	Year   int
-	Diff   float64
-}
-
-// Manually set the Fund's table name to the sample we created.
-func (Fund) TableName() string {
-	return "sampled_funds"
-}
-
-// High-level method that calls functions to request, parse, and create Records.
-func (self *Fund) PopulateRecords(db *gorm.DB) {
-	url := BuildQueryString(self)
-	response := FetchCSV(url, self)
-	records, err := ParseRecords(response, self)
-	if err != nil {
-		fmt.Println(err)
-		self.Available = false
-		self.Done = true
-		db.Save(&self)
-		return
+func ScrapeRecords(state *CrawlerState) {
+	select {
+	case fund := <-state.Funds:
+		fund.PopulateRecords(state.DB)
+	default:
+		state.WG.Done()
 	}
-	for _, record := range *records {
-		db.Create(&record)
-	}
-	self.Done = true
-	db.Save(&self)
-}
-
-// Build the URL we'll GET with the specific fund's symbol.
-// The time range is hardcoded: Jan. 1, 2000 to Dec. 31, 2016.
-func BuildQueryString(fund *Fund) *url.URL {
-	u, err := url.Parse("http://ichart.finance.yahoo.com/table.csv?s=VOO&a=00&b=01&c=2000&d=11&e=31&f=2016&g=d&ignore=.csv")
-	if err != nil {
-		log.Fatal(err)
-	}
-	q := u.Query()
-	q.Set("s", fund.Symbol)
-	u.RawQuery = q.Encode()
-	return u
-}
-
-// Make a GET request to the built URL and return it.
-// Assumes the caller will close response.Body.
-// TODO: Consider the implicaitons of this. It makes more sense to do build a
-// CSV reader and ReadAll() into a 2d array and return a pointer to that,
-// because the caller should not have to clean up after us.
-func FetchCSV(url *url.URL, fund *Fund) *http.Response {
-	response, err := http.Get(url.String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	return response
-}
-
-// Parse the response data as CSV, and create a new Record for each row.
-// TODO: Refactor into smaller units.
-// TODO: Add multithreading.
-func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
-	// Parse as CSV
-	defer response.Body.Close()
-	reader := csv.NewReader(bufio.NewReader(response.Body))
-	var records []Record
-	var err error
-	isFirstRecord := true
-
-	for {
-		record, err := reader.Read()
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			err = nil
-			break
-		}
-
-		// skip parsing the table header
-		if isFirstRecord {
-			isFirstRecord = false
-			continue
-		}
-
-		// Convert prices from strings to floats
-		openPrice, err := strconv.ParseFloat(record[CSVOpenIndex], 32)
-		if err != nil {
-			err = errors.New("failed to parse open price")
-		}
-		openPriceCents := int(openPrice * 100)
-
-		closePrice, err := strconv.ParseFloat(record[CSVCloseIndex], 32)
-		if err != nil {
-			err = errors.New("failed to parse close price")
-		}
-		closePriceCents := int(closePrice * 100)
-
-		// Convert time from string to time
-		const dateFormat = "2006-01-02"
-		recordDate, err := time.Parse(dateFormat, record[CSVDateIndex])
-		if err != nil {
-			err = errors.New("failed to parse quote date")
-		}
-
-		var fundRecord = Record{
-			Day:    recordDate,
-			Open:   openPriceCents,
-			Close:  closePriceCents,
-			FundID: fund.ID}
-		records = append(records, fundRecord)
-	}
-	return &records, err
 }
 
 // Main function that controls the crawler.
-// TODO: This should spawn worker threads.
 func Crawl() {
 	var adapter string
 	var dbPath string
 	if os.Getenv("CLOUD_BABY") == "YEAH_BABY" {
 		fmt.Println("We're in the cloud, baby")
 		adapter = "mysql"
-		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@/index_funds?charset=utf8&parseTime=True&loc=Local"
+		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@/index_funds2?charset=utf8&parseTime=True&loc=Local"
 	} else {
 		fmt.Println("We're running locally, baby")
 		adapter = "sqlite3"
@@ -183,23 +55,39 @@ func Crawl() {
 	// Migrate the schema
 	db.AutoMigrate(&Fund{}, &Record{}, &AnnualReturn{})
 
-	funds := []Fund{}
-	db.Where("done = 0").Find(&funds)
-	fmt.Println("Funds to scrape: ", len(funds))
-	for _, fund := range funds {
-		fmt.Println("Fetching fund: ", fund.Symbol)
-		fund.PopulateRecords(db)
+	// Get funds to scrape historical data for
+	allFunds := []Fund{}
+	db.Where("done = 0").Find(&allFunds)
+
+	// Set up worker goroutines and Funds channel
+	state := CrawlerState{
+		DB:    db,
+		WG:    &sync.WaitGroup{},
+		Funds: make(chan Fund, len(allFunds)),
 	}
 
-	allFunds := []Fund{}
+	fmt.Println("Funds to scrape: ", len(allFunds))
+	for _, fund := range allFunds {
+		state.Funds <- fund
+	}
+
+	// Fan out
+	for i := 0; i < NumWorkers; i++ {
+		state.WG.Add(1)
+		go ScrapeRecords(&state)
+	}
+
+	state.WG.Wait()
+
+	allFunds = []Fund{}
 	db.Where("done_perf = 0").Find(&allFunds)
 	for _, fund := range allFunds {
 		records := []Record{}
 		db.Where("fund_id = ?", fund.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
-		fmt.Printf("Performance for: %s (%d records)\n", fund.Symbol, len(records))
+		fmt.Printf("%s (%d records)\n", fund.Symbol, len(records))
 
-		if len(records)%2 != 0 {
-			fmt.Println("Odd # rows!")
+		if len(records)%2 != 0 || len(records) == 0 {
+			fmt.Printf("Bad # rows (%d)\n", len(records))
 			fund.BadData = true
 			db.Save(&fund)
 			continue
