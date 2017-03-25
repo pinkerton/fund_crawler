@@ -17,7 +17,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
-func (self *Fund) CalculateReturn(db *gorm.DB) {
+func (self *Fund) CalculateReturn(db *gorm.DB) (err error) {
 	records := []Record{}
 	db.Where("fund_id = ?", self.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
 	// fmt.Printf("%s (%d records)\n", self.Symbol, len(records))
@@ -27,7 +27,7 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 		self.Available = false
 		self.Done = true
 		db.Save(&self)
-		fmt.Printf("Skipping %s (bad return)\n", self.Symbol)
+		err = errors.New("bad # rows for calculating return")
 		return
 	}
 
@@ -40,6 +40,7 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 		performance := AnnualReturn{FundID: self.ID, Year: year, Diff: diff}
 		db.Create(&performance)
 	}
+	return
 }
 
 // High-level method that calls functions to request, parse, and create Records.
@@ -52,6 +53,7 @@ func (self *Fund) PopulateRecords(db *gorm.DB) (err error) {
 		self.Available = false
 		self.Done = true
 		db.Save(&self)
+		err = errors.New("unable to parse records")
 		return
 	}
 	for _, record := range *records {
