@@ -20,7 +20,7 @@ const (
 type CrawlerState struct {
 	DB    *gorm.DB
 	WG    sync.WaitGroup
-	Funds chan *Fund
+	Funds chan Fund
 }
 
 func ScrapeRecords(id int, state *CrawlerState) {
@@ -65,12 +65,12 @@ func Crawl() {
 	state := CrawlerState{
 		DB:    db,
 		WG:    sync.WaitGroup{},
-		Funds: make(chan *Fund, len(allFunds)),
+		Funds: make(chan Fund, len(allFunds)),
 	}
 
 	fmt.Println("Funds to scrape: ", len(allFunds))
 	for _, fund := range allFunds {
-		state.Funds <- &fund
+		state.Funds <- fund
 	}
 	close(state.Funds)
 
