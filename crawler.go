@@ -43,7 +43,7 @@ func Crawl() {
 
 	// Get funds to scrape historical data for
 	allFunds := []Fund{}
-	db.Where("done = 0").Find(&allFunds)
+	db.Where("done = 0", "available = 1").Find(&allFunds)
 
 	// Set up worker goroutines and Funds channel
 	state := CrawlerState{

@@ -24,7 +24,7 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 
 	if len(records)%2 != 0 || len(records) == 0 {
 		// fmt.Printf("Bad # rows (%d)\n", len(records))
-		self.BadData = true
+		self.Available = false
 		db.Save(&self)
 	}
 
@@ -37,8 +37,6 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 		performance := AnnualReturn{FundID: self.ID, Year: year, Diff: diff}
 		db.Create(&performance)
 	}
-	self.DonePerf = true
-	db.Save(&self)
 }
 
 // High-level method that calls functions to request, parse, and create Records.

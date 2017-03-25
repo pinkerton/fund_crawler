@@ -17,8 +17,6 @@ type Fund struct {
 	Type      string
 	Available bool     `gorm:"default:true"`
 	Done      bool     `gorm:"default:false"`
-	BadData   bool     `gorm:"default:false"`
-	DonePerf  bool     `gorm:"default:false"`
 	Records   []Record `gorm:"ForeignKey:FundID"`
 }
 
