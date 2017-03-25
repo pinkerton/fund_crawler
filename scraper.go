@@ -27,6 +27,7 @@ func (self *Fund) CalculateReturn(db *gorm.DB) {
 		self.Available = false
 		self.Done = true
 		db.Save(&self)
+		fmt.Printf("Skipping %s (bad return)\n", self.Symbol)
 		return
 	}
 
