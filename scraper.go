@@ -93,7 +93,7 @@ func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
 	// Parse as CSV
 	defer response.Body.Close()
 	reader := csv.NewReader(bufio.NewReader(response.Body))
-	var records []Record
+	records := make([]Record, 2000)
 	var err error
 	isFirstRecord := true
 

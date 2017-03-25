@@ -20,18 +20,24 @@ const (
 type CrawlerState struct {
 	DB    *gorm.DB
 	WG    *sync.WaitGroup
-	Funds chan Fund
+	Funds chan *Fund
 }
 
 func ScrapeRecords(state *CrawlerState) {
-	select {
-	case fund := <-state.Funds:
+	// select {
+	// case fund := <-state.Funds:
+	// 	fund.PopulateRecords(state.DB)
+	// 	fund.CalculateReturn(state.DB)
+	// 	fmt.Printf("%s\n", fund.Symbol)
+	// default:
+	// 	state.WG.Done()
+	// }
+	for fund := range state.Funds {
 		fund.PopulateRecords(state.DB)
 		fund.CalculateReturn(state.DB)
 		fmt.Printf("%s\n", fund.Symbol)
-	default:
-		state.WG.Done()
 	}
+	state.WG.Done()
 }
 
 // Main function that controls the crawler.
@@ -50,12 +56,12 @@ func Crawl() {
 	state := CrawlerState{
 		DB:    db,
 		WG:    &sync.WaitGroup{},
-		Funds: make(chan Fund, len(allFunds)),
+		Funds: make(chan *Fund, len(allFunds)),
 	}
 
 	fmt.Println("Funds to scrape: ", len(allFunds))
 	for _, fund := range allFunds {
-		state.Funds <- fund
+		state.Funds <- &fund
 	}
 
 	// Fan out
@@ -64,4 +70,5 @@ func Crawl() {
 		go ScrapeRecords(&state)
 	}
 	state.WG.Wait()
+	close(state.Funds)
 }

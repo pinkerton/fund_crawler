@@ -2,6 +2,10 @@ package main
 
 import (
 	"fund_crawler"
+	"log"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 // catch interrupt signals: http://stackoverflow.com/a/18158859
@@ -13,6 +17,8 @@ func main() {
 	// 	fmt.Println("Cleaning up")
 	// 	os.Exit(1)
 	// }()
-
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	fund_crawler.Crawl()
 }
