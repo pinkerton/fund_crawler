@@ -28,6 +28,7 @@ func ScrapeRecords(state *CrawlerState) {
 	case fund := <-state.Funds:
 		fund.PopulateRecords(state.DB)
 		fund.CalculateReturn(state.DB)
+		fmt.Printf("%s\n", fund.Symbol)
 	default:
 		state.WG.Done()
 	}
