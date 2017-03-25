@@ -24,21 +24,13 @@ type CrawlerState struct {
 }
 
 func ScrapeRecords(state *CrawlerState) {
-	select {
-	case fund := <-state.Funds:
+	for fund := range state.Funds {
 		fund.PopulateRecords(state.DB)
 		fund.CalculateReturn(state.DB)
 		fmt.Printf("%s\n", fund.Symbol)
-	default:
-		fmt.Println("Done")
-		state.WG.Done()
 	}
-	// for fund := range state.Funds {
-	// 	fund.PopulateRecords(state.DB)
-	// 	fund.CalculateReturn(state.DB)
-	// 	fmt.Printf("%s\n", fund.Symbol)
-	// }
-	// state.WG.Done()
+	fmt.Println("Done!")
+	state.WG.Done()
 }
 
 // Main function that controls the crawler.
@@ -64,6 +56,7 @@ func Crawl() {
 	for _, fund := range allFunds {
 		state.Funds <- &fund
 	}
+	close(state.Funds)
 
 	// Fan out
 	for i := 0; i < NumWorkers; i++ {
@@ -71,5 +64,4 @@ func Crawl() {
 		go ScrapeRecords(&state)
 	}
 	state.WG.Wait()
-	close(state.Funds)
 }
