@@ -1,11 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"fund_crawler"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 // catch interrupt signals: http://stackoverflow.com/a/18158859
