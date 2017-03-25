@@ -17,6 +17,30 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
+func (self *Fund) CalculateReturn(db *gorm.DB) {
+	records := []Record{}
+	db.Where("fund_id = ?", self.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
+	// fmt.Printf("%s (%d records)\n", self.Symbol, len(records))
+
+	if len(records)%2 != 0 || len(records) == 0 {
+		// fmt.Printf("Bad # rows (%d)\n", len(records))
+		self.BadData = true
+		db.Save(&self)
+	}
+
+	for i := 0; i < len(records)-1; i += 2 {
+		year := records[i].Day.Year()
+		yearOpening := records[i].Open
+		yearClosing := records[i+1].Close
+		var diff float64 = float64(yearClosing-yearOpening) / float64(yearOpening)
+		// fmt.Printf("\t%d: %.3f\n", year, diff)
+		performance := AnnualReturn{FundID: self.ID, Year: year, Diff: diff}
+		db.Create(&performance)
+	}
+	self.DonePerf = true
+	db.Save(&self)
+}
+
 // High-level method that calls functions to request, parse, and create Records.
 func (self *Fund) PopulateRecords(db *gorm.DB) {
 	url := BuildQueryString(self)
