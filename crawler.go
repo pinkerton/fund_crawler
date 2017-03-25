@@ -19,7 +19,7 @@ const (
 // CrawlerState holds state shared by worker goroutines.
 type CrawlerState struct {
 	DB    *gorm.DB
-	WG    *sync.WaitGroup
+	WG    sync.WaitGroup
 	Funds chan *Fund
 }
 
@@ -54,17 +54,17 @@ func Crawl() {
 	allFunds := []Fund{}
 	db.Where("done = 0 AND available = 1").Order("id asc").Find(&allFunds)
 	// ogFund := allFunds[0]
-	for _, fund := range allFunds {
-		fmt.Printf("%s\n", fund.Symbol)
-		// if fund.Symbol != ogFund.Symbol {
-		// 	fmt.Printf("Different symbols (%s and %s)\n", ogFund.Symbol, fund.Symbol)
-		// }
-	}
+	// for _, fund := range allFunds {
+	// 	// fmt.Printf("%s\n", fund.Symbol)
+	// 	// if fund.Symbol != ogFund.Symbol {
+	// 	// 	fmt.Printf("Different symbols (%s and %s)\n", ogFund.Symbol, fund.Symbol)
+	// 	// }
+	// }
 
 	// Set up worker goroutines and Funds channel
 	state := CrawlerState{
 		DB:    db,
-		WG:    &sync.WaitGroup{},
+		WG:    sync.WaitGroup{},
 		Funds: make(chan *Fund, len(allFunds)),
 	}
 
