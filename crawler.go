@@ -25,18 +25,19 @@ type CrawlerState struct {
 
 func ScrapeRecords(id int, state *CrawlerState) {
 	for fund := range state.Funds {
-		fmt.Printf("#%d => Attempting: %s\n", id, fund.Symbol)
+		fmt.Printf("#%d: %s\n", id, fund.Symbol)
 		err := fund.PopulateRecords(state.DB)
 		if err != nil {
-			fmt.Printf("#%d => Skipping %s (%s)\n", id, fund.Symbol, err)
+			fmt.Printf("#%d\t=> Skipping %s (%s)\n", id, fund.Symbol, err)
 			continue
 		}
 		err = fund.CalculateReturn(state.DB)
 		if err != nil {
-			fmt.Printf("#%d => Skipping %s (%s)\n", id, fund.Symbol, err)
+			fmt.Printf("#%d\t=> Skipping %s (%s)\n", id, fund.Symbol, err)
 			continue
 		}
-		fmt.Printf("%s\n", fund.Symbol)
+		fmt.Printf("#%d\t=> Done (%s)\n", id, fund.Symbol)
+
 	}
 	fmt.Println("#%d => Done!", id)
 	state.WG.Done()
