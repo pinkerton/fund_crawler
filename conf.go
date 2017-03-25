@@ -38,9 +38,9 @@ type AnnualReturn struct {
 }
 
 // Manually set the Fund's table name to the sample we created.
-func (Fund) TableName() string {
-	return "sampled_funds"
-}
+// func (Fund) TableName() string {
+// 	return "sampled_funds"
+// }
 
 func GetDB() *gorm.DB {
 	var adapter string
