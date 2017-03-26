@@ -18,21 +18,15 @@ type Fund struct {
 	Available bool     `gorm:"default:true"`
 	Done      bool     `gorm:"default:false"`
 	Records   []Record `gorm:"ForeignKey:FundID"`
+	CAGR      float32
 }
 
 type Record struct {
 	gorm.Model
 	Day    time.Time
-	Open   int
-	Close  int
+	Open   int // Cents
+	Close  int // Cents
 	FundID uint
-}
-
-type AnnualReturn struct {
-	gorm.Model
-	FundID uint
-	Year   int
-	Diff   float64
 }
 
 // Manually set the Fund's table name to the sample we created.
@@ -46,7 +40,7 @@ func GetDB() *gorm.DB {
 	if os.Getenv("CLOUD_BABY") == "YEAH_BABY" {
 		fmt.Println("We're in the cloud, baby")
 		adapter = "mysql"
-		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@/index_funds2?charset=utf8&parseTime=True&loc=Local"
+		dbPath = "pink:Tbz7vr2yiiaywNHF6Uu@/index_funds3?charset=utf8&parseTime=True&loc=Local"
 	} else {
 		fmt.Println("We're running locally, baby")
 		adapter = "sqlite3"

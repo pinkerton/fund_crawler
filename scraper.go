@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"encoding/csv"
 	"errors"
-	"fmt"
-	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,51 +16,39 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
-func (self *Fund) CalculateReturn(db *gorm.DB) (err error) {
-	records := []Record{}
-	db.Where("fund_id = ?", self.ID).Group("year(day), month(day)").Having("month(day) = 1 or month(day) = 12").Find(&records)
-	// fmt.Printf("%s (%d records)\n", self.Symbol, len(records))
+const (
+	FloatSize    = 32
+	HoursPerYear = 24 * 365
+)
 
-	if len(records)%2 != 0 || len(records) == 0 {
-		// fmt.Printf("Bad # rows (%d)\n", len(records))
-		self.Available = false
-		self.Done = true
-		db.Save(&self)
-		err = errors.New("bad # rows for calculating return")
-		return
-	}
-
-	for i := 0; i < len(records)-1; i += 2 {
-		year := records[i].Day.Year()
-		yearOpening := records[i].Open
-		yearClosing := records[i+1].Close
-		var diff float64 = float64(yearClosing-yearOpening) / float64(yearOpening)
-		// fmt.Printf("\t%d: %.3f\n", year, diff)
-		performance := AnnualReturn{FundID: self.ID, Year: year, Diff: diff}
-		db.Create(&performance)
-	}
-	return
+// Calculate the compound annual growth rate for a fund between two Records.
+// http://www.investinganswers.com/financial-dictionary/investing/compound-annual-growth-rate-cagr-1096
+func (self *Fund) CalculateReturn(before *Record, after *Record) {
+	hoursBtwn := after.Day.Sub(before.Day).Hours() // Duration value can represent up to 290 years. We're okay.
+	var yearsBtwn float64 = float64(hoursBtwn) / HoursPerYear
+	var quotient float64 = float64(after.Close / before.Open)
+	cagr := math.Pow(quotient, 1/yearsBtwn) - 1
+	self.CAGR = float32(cagr)
 }
 
 // High-level method that calls functions to request, parse, and create Records.
-func (self *Fund) PopulateRecords(db *gorm.DB) (err error) {
+func (self *Fund) GetRecords(db *gorm.DB) (*Record, *Record, error) {
 	url := BuildQueryString(self)
 	response := FetchCSV(url, self)
-	records, err := ParseRecords(response, self)
+	before, after, err := self.ParseRecords(response)
 	if err != nil {
-		fmt.Println(err)
-		self.Available = false
-		self.Done = true
-		db.Save(&self)
-		err = errors.New("unable to parse records")
-		return
+		// fmt.Println(err)
+		// err = errors.New("unable to parse records")
+		return nil, nil, err
 	}
-	for _, record := range *records {
-		db.Create(&record)
-	}
+	return before, after, err
+}
+
+// Mark a fund as having bad data.
+// Assumes the caller will call db.Save(self)
+func (self *Fund) Ignore() {
+	self.Available = false
 	self.Done = true
-	db.Save(&self)
-	return
 }
 
 // Build the URL we'll GET with the specific fund's symbol.
@@ -79,9 +66,6 @@ func BuildQueryString(fund *Fund) *url.URL {
 
 // Make a GET request to the built URL and return it.
 // Assumes the caller will close response.Body.
-// TODO: Consider the implicaitons of this. It makes more sense to do build a
-// CSV reader and ReadAll() into a 2d array and return a pointer to that,
-// because the caller should not have to clean up after us.
 func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 	response, err := http.Get(url.String())
 	if err != nil {
@@ -90,61 +74,61 @@ func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 	return response
 }
 
+// Convert an array of CSV fields into a Record type.
+// Does not add the Fund ID or Create the value in the database.
+func CSVToRecord(fields []string) (record Record, err error) {
+	// Convert prices from strings to floats
+	openPrice, err := strconv.ParseFloat(fields[CSVOpenIndex], FloatSize)
+	if err != nil {
+		err = errors.New("failed to parse open price")
+	}
+	openPriceCents := int(openPrice * 100)
+
+	closePrice, err := strconv.ParseFloat(fields[CSVCloseIndex], FloatSize)
+	if err != nil {
+		err = errors.New("failed to parse close price")
+	}
+	closePriceCents := int(closePrice * 100)
+
+	// Convert time from string to time
+	const dateFormat = "2006-01-02"
+	recordDate, err := time.Parse(dateFormat, fields[CSVDateIndex])
+	if err != nil {
+		err = errors.New("failed to parse quote date")
+	}
+	record.Day = recordDate
+	record.Open = openPriceCents
+	record.Close = closePriceCents
+	return
+}
+
 // Parse the response data as CSV, and create a new Record for each row.
 // TODO: Refactor into smaller units.
-// TODO: Add multithreading.
-func ParseRecords(response *http.Response, fund *Fund) (*[]Record, error) {
+func (self *Fund) ParseRecords(response *http.Response) (before *Record, after *Record, err error) {
 	// Parse as CSV
 	defer response.Body.Close()
 	reader := csv.NewReader(bufio.NewReader(response.Body))
-	records := make([]Record, 2000)
-	var err error
-	isFirstRecord := true
 
-	for {
-		record, err := reader.Read()
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			err = nil
-			break
-		}
-
-		// skip parsing the csv table header
-		if isFirstRecord {
-			isFirstRecord = false
-			continue
-		}
-
-		// Convert prices from strings to floats
-		openPrice, err := strconv.ParseFloat(record[CSVOpenIndex], 32)
-		if err != nil {
-			err = errors.New("failed to parse open price")
-		}
-		openPriceCents := int(openPrice * 100)
-
-		closePrice, err := strconv.ParseFloat(record[CSVCloseIndex], 32)
-		if err != nil {
-			err = errors.New("failed to parse close price")
-		}
-		closePriceCents := int(closePrice * 100)
-
-		// Convert time from string to time
-		const dateFormat = "2006-01-02"
-		recordDate, err := time.Parse(dateFormat, record[CSVDateIndex])
-		if err != nil {
-			err = errors.New("failed to parse quote date")
-		}
-
-		var fundRecord = Record{
-			Day:    recordDate,
-			Open:   openPriceCents,
-			Close:  closePriceCents,
-			FundID: fund.ID}
-		records = append(records, fundRecord)
+	csvRecords, err := reader.ReadAll()
+	if err != nil {
+		return
 	}
-	return &records, err
+
+	firstRecordFields := csvRecords[1]
+	lastRecordFields := csvRecords[len(csvRecords)-1]
+
+	firstRecord, err := CSVToRecord(firstRecordFields)
+	if err != nil {
+		return
+	}
+
+	lastRecord, err := CSVToRecord(lastRecordFields)
+	if err != nil {
+		return
+	}
+
+	firstRecord.FundID = self.ID
+	lastRecord.FundID = self.ID
+
+	return
 }

@@ -13,7 +13,7 @@ const (
 	CSVDateIndex  = 0
 	CSVOpenIndex  = 1
 	CSVCloseIndex = 4
-	NumWorkers    = 9
+	NumWorkers    = 10
 )
 
 // CrawlerState holds state shared by worker goroutines.
@@ -26,20 +26,28 @@ type CrawlerState struct {
 func ScrapeRecords(id int, state *CrawlerState) {
 	for fund := range state.Funds {
 		fmt.Printf("#%d: %s\n", id, fund.Symbol)
-		err := fund.PopulateRecords(state.DB)
+
+		// Get first and last records for the fund
+		before, after, err := fund.GetRecords(state.DB)
 		if err != nil {
 			fmt.Printf("#%d\t=> Skipping %s (%s)\n", id, fund.Symbol, err)
+			fund.Ignore()
+			state.DB.Save(&fund)
 			continue
 		}
-		err = fund.CalculateReturn(state.DB)
-		if err != nil {
-			fmt.Printf("#%d\t=> Skipping %s (%s)\n", id, fund.Symbol, err)
-			continue
-		}
+
+		// Calculate CAGR
+		fund.CalculateReturn(before, after)
+
+		// Done. Save everything.
+		fund.Done = true
+		state.DB.Save(&fund) // TODO: will this actuall save the fund?
+		state.DB.Create(before)
+		state.DB.Create(after)
 		fmt.Printf("#%d\t=> Done (%s)\n", id, fund.Symbol)
 
 	}
-	fmt.Println("#%d => Done!", id)
+	fmt.Printf("#%d => Done!\n", id)
 	state.WG.Done()
 }
 
@@ -49,18 +57,11 @@ func Crawl() {
 	defer db.Close()
 
 	// Migrate the schema
-	db.AutoMigrate(&Fund{}, &Record{}, &AnnualReturn{})
+	db.AutoMigrate(&Fund{}, &Record{})
 
 	// Get funds to scrape historical data for
 	allFunds := []Fund{}
 	db.Where("done = 0 AND available = 1").Order("id asc").Find(&allFunds)
-	// ogFund := allFunds[0]
-	// for _, fund := range allFunds {
-	// 	// fmt.Printf("%s\n", fund.Symbol)
-	// 	// if fund.Symbol != ogFund.Symbol {
-	// 	// 	fmt.Printf("Different symbols (%s and %s)\n", ogFund.Symbol, fund.Symbol)
-	// 	// }
-	// }
 
 	// Set up worker goroutines and Funds channel
 	state := CrawlerState{
