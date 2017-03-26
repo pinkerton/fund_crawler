@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -24,9 +25,9 @@ const (
 // Calculate the compound annual growth rate for a fund between two Records.
 // http://www.investinganswers.com/financial-dictionary/investing/compound-annual-growth-rate-cagr-1096
 func (self *Fund) CalculateReturn(before *Record, after *Record) {
-	hoursBtwn := after.Day.Sub(before.Day).Hours() // Duration value can represent up to 290 years. We're okay.
-	var yearsBtwn float64 = float64(hoursBtwn) / HoursPerYear
-	var quotient float64 = float64(after.Close / before.Open)
+	hoursBtwn := after.Day.Sub(before.Day).Hours() // Duration type can represent up to 290 years. We're okay.
+	yearsBtwn := float64(hoursBtwn) / HoursPerYear
+	quotient := float64(after.Close) / float64(before.Open)
 	cagr := math.Pow(quotient, 1/yearsBtwn) - 1
 	self.CAGR = float32(cagr)
 }
@@ -114,8 +115,8 @@ func (self *Fund) ParseRecords(response *http.Response) (*Record, *Record, error
 		return nil, nil, err
 	}
 
-	firstRecordFields := csvRecords[1]
-	lastRecordFields := csvRecords[len(csvRecords)-1]
+	lastRecordFields := csvRecords[1]
+	firstRecordFields := csvRecords[len(csvRecords)-1]
 
 	before, err := CSVToRecord(firstRecordFields)
 	if err != nil {
