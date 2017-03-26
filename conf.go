@@ -19,6 +19,7 @@ type Fund struct {
 	Done      bool     `gorm:"default:false"`
 	Records   []Record `gorm:"ForeignKey:FundID"`
 	CAGR      float32
+	Years     float32
 }
 
 type Record struct {

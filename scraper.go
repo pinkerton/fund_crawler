@@ -29,6 +29,7 @@ func (self *Fund) CalculateReturn(before *Record, after *Record) {
 	quotient := float64(after.Close) / float64(before.Open)
 	cagr := math.Pow(quotient, 1/yearsBtwn) - 1
 	self.CAGR = float32(cagr)
+	self.Years = float32(yearsBtwn)
 }
 
 // High-level method that calls functions to request, parse, and create Records.
