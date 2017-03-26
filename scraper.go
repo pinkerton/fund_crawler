@@ -76,7 +76,7 @@ func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 
 // Convert an array of CSV fields into a Record type.
 // Does not add the Fund ID or Create the value in the database.
-func CSVToRecord(fields []string) (record *Record, err error) {
+func CSVToRecord(fields []string) (record Record, err error) {
 	// Convert prices from strings to floats
 	openPrice, err := strconv.ParseFloat(fields[CSVOpenIndex], FloatSize)
 	if err != nil {
@@ -104,30 +104,30 @@ func CSVToRecord(fields []string) (record *Record, err error) {
 
 // Parse the response data as CSV, and create a new Record for each row.
 // TODO: Refactor into smaller units.
-func (self *Fund) ParseRecords(response *http.Response) (before *Record, after *Record, err error) {
+func (self *Fund) ParseRecords(response *http.Response) (*Record, *Record, error) {
 	// Parse as CSV
 	defer response.Body.Close()
 	reader := csv.NewReader(bufio.NewReader(response.Body))
 
 	csvRecords, err := reader.ReadAll()
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	firstRecordFields := csvRecords[1]
 	lastRecordFields := csvRecords[len(csvRecords)-1]
 
-	before, err = CSVToRecord(firstRecordFields)
+	before, err := CSVToRecord(firstRecordFields)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
-	after, err = CSVToRecord(lastRecordFields)
+	after, err := CSVToRecord(lastRecordFields)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	before.FundID = self.ID
 	after.FundID = self.ID
-	return
+	return &before, &after, err
 }
