@@ -76,7 +76,7 @@ func FetchCSV(url *url.URL, fund *Fund) *http.Response {
 
 // Convert an array of CSV fields into a Record type.
 // Does not add the Fund ID or Create the value in the database.
-func CSVToRecord(fields []string) (record Record, err error) {
+func CSVToRecord(fields []string) (record *Record, err error) {
 	// Convert prices from strings to floats
 	openPrice, err := strconv.ParseFloat(fields[CSVOpenIndex], FloatSize)
 	if err != nil {
@@ -117,18 +117,17 @@ func (self *Fund) ParseRecords(response *http.Response) (before *Record, after *
 	firstRecordFields := csvRecords[1]
 	lastRecordFields := csvRecords[len(csvRecords)-1]
 
-	firstRecord, err := CSVToRecord(firstRecordFields)
+	before, err = CSVToRecord(firstRecordFields)
 	if err != nil {
 		return
 	}
 
-	lastRecord, err := CSVToRecord(lastRecordFields)
+	after, err = CSVToRecord(lastRecordFields)
 	if err != nil {
 		return
 	}
 
-	firstRecord.FundID = self.ID
-	lastRecord.FundID = self.ID
-
+	before.FundID = self.ID
+	after.FundID = self.ID
 	return
 }
