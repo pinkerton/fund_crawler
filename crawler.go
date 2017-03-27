@@ -23,7 +23,9 @@ type CrawlerState struct {
 	Funds chan Fund
 }
 
-func ScrapeRecords(id int, state *CrawlerState) {
+// High-level function (intended to be run as worker goroutines) that
+// fetches and parses financial data and calculates the CAGR for each fund.
+func ScrapeRecordsWorker(id int, state *CrawlerState) {
 	for fund := range state.Funds {
 		fmt.Printf("#%d: %s\n", id, fund.Symbol)
 
@@ -51,7 +53,7 @@ func ScrapeRecords(id int, state *CrawlerState) {
 	state.WG.Done()
 }
 
-// Main function that controls the crawler.
+// Main function that sets up state for the Crawler and fans out to crawler goroutines.
 func Crawl() {
 	db := GetDB()
 	defer db.Close()
@@ -79,7 +81,7 @@ func Crawl() {
 	// Fan out
 	for i := 0; i < NumWorkers; i++ {
 		state.WG.Add(1)
-		go ScrapeRecords(i, &state)
+		go ScrapeRecordsWorker(i, &state)
 	}
 	state.WG.Wait()
 }

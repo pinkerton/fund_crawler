@@ -38,8 +38,6 @@ func (self *Fund) GetRecords(db *gorm.DB) (*Record, *Record, error) {
 	response := FetchCSV(url, self)
 	before, after, err := self.ParseRecords(response)
 	if err != nil {
-		// fmt.Println(err)
-		// err = errors.New("unable to parse records")
 		return nil, nil, err
 	}
 	return before, after, err
@@ -103,10 +101,8 @@ func CSVToRecord(fields []string) (record Record, err error) {
 	return
 }
 
-// Parse the response data as CSV, and create a new Record for each row.
-// TODO: Refactor into smaller units.
+// Parse the response data as CSV, and return Records for the first and last row.
 func (self *Fund) ParseRecords(response *http.Response) (*Record, *Record, error) {
-	// Parse as CSV
 	defer response.Body.Close()
 	reader := csv.NewReader(bufio.NewReader(response.Body))
 
